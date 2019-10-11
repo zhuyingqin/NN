@@ -38,7 +38,7 @@ hidden_dim = 16         # 存储我们的进位位的隐藏层的大小
 output_dim = 1          # 预测总和
 # initialize neural network weights
 # 初始化神经网络权值
-synapse_0 = 2*np.random.random((input_dim, hidden_dim)) - 1     # 连接输入层和隐藏层的权重矩阵
+synapse_0 = 2*np.random.random((input_dim, hidden_dim)) - 1     # 连接输入层到隐藏层的权重矩阵
 synapse_1 = 2*np.random.random((hidden_dim, output_dim)) - 1    # 隐藏层连接到输出层的权重矩阵
 # 权重矩阵，用于将上一个时间点中的隐藏层连接到当前时间步中的隐藏层。
 synapse_h = 2*np.random.random((hidden_dim, hidden_dim)) - 1
@@ -67,15 +67,15 @@ for j in range(100000):
     # 每次把总误差清零
     overallError = 0
 
-    layer_2_deltas = list()     # 存储每个时间点输出层的误差
-    layer_1_values = list()     # 存储每个时间点隐藏层的值
+    layer_2_deltas = list()                          # 存储每个时间点输出层的误差
+    layer_1_values = list()                          # 存储每个时间点隐藏层的值
     layer_1_values.append(np.zeros(hidden_dim))      # 一开始没有隐藏层，所以里面都是0
 
     for position in range(binary_dim):
         # 循环遍历每一个二进制位
         # 从右到左，每次去两个输入数字的一个bit位
         # binary_dim = 8
-        x = np.array([[a[binary_dim - position - 1], b[binary_dim - position - 1]]])
+        X = np.array([[a[binary_dim - position - 1], b[binary_dim - position - 1]]])
         # 例如[0,0],[0,1]
         # X与图片中的“ layer_0”相同。X是2个数字的列表，一个来自a，一个来自b。它是根据“位置”变量进行索引的，
         # 但是我们以从右到左的方式对其进行索引。因此，当position == 0时
@@ -83,9 +83,14 @@ for j in range(100000):
         y = np.array([[c[binary_dim - position - 1]]]).T    # 正确答案的值
 
         # hidden layer (input + prev_hidden)x
-        layer_1 = sigmoid(np.dot(x, synapse_0))
+        # （输入层 + 之前的隐藏层） -> 新的隐藏层，这是体现循环神经网络的最核心的地方！！！
+        # synapse_0 输入层到隐藏层的权重与输入X点乘，
+        # layer_1_values是上一个时间点的隐藏层的值和
+        layer_1 = sigmoid(np.dot(X, synapse_0) + np.dot(layer_1_values[-1], synapse_h))
         # output layer (new binary representation)
+        # 隐藏层 * 隐藏层到输出层的转化矩阵synapse_1 -> 输出层
         layer_2 = sigmoid(np.dot(layer_1, synapse_1))
+        # print("layer_2:", layer_2)
         #
         layer_2_error = y - layer_2                         # 预测误差是多少
         # 我们把每一个时间点的误差导数都记录下来
@@ -106,17 +111,16 @@ for j in range(100000):
         prev_layer_1 = layer_1_values[-position-2]      # 前一个时间点的隐藏层
 
         # error at output layer
-        layer_2_delta = layer_2_deltas[-position-1]    # 当前时间点输出层导数
+        layer_2_delta = layer_2_deltas[-position-1]    # 从列表中选择当前输出错误
         # error at hidden layer
         # 通过后一个时间点（因为是反向传播）的隐藏层误差和当前时间点的输出层误差
         # 计算当前时间点的隐藏层误差
-        layer_1_delta = (future_layer_1_delta.dot(synapse_h.T) + layer_2_delta.dot(synapse_1.T))\
-                        * sigmoid_output_to_derivative(layer_1)
+        layer_1_delta = (future_layer_1_delta.dot(synapse_h.T) + layer_2_delta.dot(synapse_1.T)) * \
+            sigmoid_output_to_derivative(layer_1)
         # let's update all our weights so we can try again
         # 我们已经完成了当前时间点的反向传播误差计算，可以构建更新矩阵了。
         # 但是我们并不会现在就更新权重矩阵，因为我们还要用他们计算前一个时间点的更新矩阵
         # 所以要等我们完成所有反向传播误差计算，才会真正的去更新权重矩阵，我们暂时把更新矩阵存起来
-        #
         synapse_1_update += np.atleast_2d(layer_1).T.dot(layer_2_delta)
         synapse_h_update += np.atleast_2d(prev_layer_1).T.dot(layer_1_delta)
         synapse_0_update += X.T.dot(layer_1_delta)
@@ -127,9 +131,9 @@ for j in range(100000):
     synapse_1 += synapse_1_update * alpha
     synapse_h += synapse_h_update * alpha
 
-    synapse_0 *= 0
-    synapse_1 *= 0
-    synapse_h *= 0
+    synapse_0_update *= 0
+    synapse_1_update *= 0
+    synapse_h_update *= 0
     # print out progress3
     if(j % 1000 == 0):
         print("Error:" + str(overallError))
