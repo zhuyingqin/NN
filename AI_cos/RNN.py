@@ -127,7 +127,7 @@ for j in range(100000):
 
         future_layer_1_delta = layer_1_delta
     # 我们已经完成了所有的反向传播，可以更新几个转换矩阵了。并把更新矩阵变量清零
-    synapse_0 += synapse_0_update * alpha
+    synapse_0 += synapse_0_update * alpha       # 神经元
     synapse_1 += synapse_1_update * alpha
     synapse_h += synapse_h_update * alpha
 
